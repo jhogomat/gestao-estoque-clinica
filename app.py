@@ -1,99 +1,99 @@
 import streamlit as st
+import pandas as pd
+from datetime import datetime
 
-# Configuração da página
-st.set_page_config(page_title="Gestão de Insumos Pro", layout="wide")
+# CONFIGURAÇÃO DA PÁGINA
+st.set_page_config(page_title="Gestão de Estoque Clínica", layout="wide")
 
-# Estilização CSS para o visual SaaS/Moderno
+# CSS PARA BOTÕES À DIREITA
 st.markdown("""
     <style>
-    /* Fundo e Container Principal */
-    .stApp {
-        background-color: #F4F7F6;
-    }
-    
-    /* Estilo dos Cards e Elementos (Glassmorfismo leve) */
-    div[data-testid="stVerticalBlock"] > div:has(div.stMetric) {
-        background: rgba(255, 255, 255, 0.8);
-        border-radius: 15px;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    }
-
-    /* Botões Modernos */
-    .stButton>button {
-        border-radius: 8px;
-        border: none;
-        transition: all 0.3s ease;
-        font-weight: 500;
-        width: 100%;
-    }
-    
-    /* Cores específicas dos botões */
-    div.stButton > button:first-child { background-color: #2563EB; color: white; } /* Dashboard/Azul */
-    
-    /* Efeito Hover */
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
-    }
+    [data-testid="stSidebar"] { order: 2; border-left: 1px solid #ddd; }
+    .stButton>button { width: 100%; border-radius: 5px; font-weight: bold; height: 3em; }
     </style>
     """, unsafe_allow_html=True)
-# --- MENU LATERAL ---
-with st.sidebar:
-    st.title("📦 Gestão Pro")
-    st.write(f"Conectado como: **{st.session_state.get('nome_usuario', 'Usuário')}**")
-    
-    st.divider()
-    st.subheader("🚀 Navegação")
-    
-    # Restauração dos botões de navegação
-    if st.button("📊 Dashboard"):
-        st.session_state.menu = "Dashboard"
-    
-    if st.button("📝 Cadastro de Produtos"):
-        st.session_state.menu = "Cadastro de Produtos"
-        
-    if st.button("📂 Cadastro de Categoria"):
-        st.session_state.menu = "Cadastro de Categoria"
 
-    st.divider()
-    st.subheader("🔄 Movimentação")
-    
-    if st.button("📥 Entrada de Produtos"):
-        st.session_state.menu = "Entrada"
-        
-    if st.button("📤 Saída de Produtos"):
-        st.session_state.menu = "Saída"
+# LOGIN
+if 'autenticado' not in st.session_state:
+    st.session_state.autenticado = False
 
-    st.divider()
-    if st.button("🚪 Sair"):
-        st.session_state.autenticado = False
-        st.rerun()
-# Lógica de exibição das telas
-menu = st.session_state.get('menu', 'Dashboard')
+if not st.session_state.autenticado:
+    st.title("🔐 Acesso ao Sistema Assistencial")
+    with st.form("login"):
+        u = st.text_input("Usuário")
+        p = st.text_input("Senha", type="password")
+        if st.form_submit_button("Entrar"):
+            if u == "fhomarcos@gmail.com" and p == "clinica2026":
+                st.session_state.autenticado = True
+                st.session_state.usuario = u
+                st.rerun()
+            else:
+                st.error("Usuário ou senha incorretos")
+    st.stop()
 
-if menu == "Dashboard":
-    st.header("📊 Painel de Controle")
-    # Seus indicadores de Estoque Total, Risco Assistencial e Validades
-    
-elif menu == "Entrada":
+# MENU LATERAL (DIREITA)
+st.sidebar.title("MENU")
+st.sidebar.write(f"👤 {st.session_state.usuario}")
+uploaded_file = st.sidebar.file_uploader("Upload XLSX", type=['xlsx'])
+st.sidebar.divider()
+
+if st.sidebar.button("📊 Dashboard"): st.session_state.aba = "dash"
+if st.sidebar.button("📝 Cadastro de Produtos"): st.session_state.aba = "cad_prod"
+if st.sidebar.button("📥 Entrada de Produtos"): st.session_state.aba = "entrada"
+if st.sidebar.button("📤 Saída de Produtos"): st.session_state.aba = "saida"
+if st.sidebar.button("📂 Cadastro de Categoria"): st.session_state.aba = "categoria"
+if st.sidebar.button("📦 Estoque"): st.session_state.aba = "estoque"
+if st.sidebar.button("📅 Inventário"): st.session_state.aba = "inventario"
+if st.sidebar.button("🚪 Sair"):
+    st.session_state.autenticado = False
+    st.rerun()
+
+if 'aba' not in st.session_state: st.session_state.aba = "dash"
+
+# TELAS
+if st.session_state.aba == "dash":
+    st.title("🏥 Gestão de Riscos e Suprimentos")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Itens Totais", "972")
+    c2.metric("Críticos", "1", delta="Laranja")
+    c3.metric("Status", "Conforme")
+
+elif st.session_state.aba == "cad_prod":
+    st.header("📝 Cadastro de Produtos")
+    with st.form("f_prod"):
+        st.text_input("Nome do Produto")
+        st.text_input("Código")
+        st.selectbox("Categoria", ["Medicamentos", "Materiais"])
+        st.form_submit_button("Salvar")
+
+elif st.session_state.aba == "entrada":
     st.header("📥 Entrada de Produtos")
-    with st.container():
+    with st.form("f_ent"):
         col1, col2 = st.columns(2)
-        id_pedido = col1.text_input("ID do Pedido")
-        data = col2.date_input("Data")
-        qtd = st.number_input("Quantidade", min_value=1)
-        
-        # Botão Verde conforme instrução
-        if st.markdown('<button style="background-color: #22C55E; color: white; border-radius: 8px; width: 100%; padding: 10px; border: none;">Confirmar Entrada</button>', unsafe_allow_html=True):
-            pass # Lógica de salvar
+        col1.text_input("ID do Pedido")
+        col2.date_input("Data")
+        st.number_input("Quantidade", min_value=1)
+        st.form_submit_button("Confirmar Entrada")
 
-elif menu == "Saída":
+elif st.session_state.aba == "saida":
     st.header("📤 Saída de Produtos")
-    with st.container():
-        codigo = st.text_input("Código do Produto")
-        qtd_saida = st.number_input("Qtd Saída", min_value=1)
-        
-        # Botão Laranja conforme instrução
-        if st.markdown('<button style="background-color: #F97316; color: white; border-radius: 8px; width: 100%; padding: 10px; border: none;">Registrar Baixa</button>', unsafe_allow_html=True):
-            pass # Lógica de salvar
+    with st.form("f_sai"):
+        st.text_input("Código do Produto")
+        st.number_input("Qtd Saída", min_value=1)
+        st.form_submit_button("Registrar Baixa")
+
+elif st.session_state.aba == "categoria":
+    st.header("📂 Cadastro de Categoria")
+    st.text_input("Nova Categoria")
+    st.button("Cadastrar")
+
+elif st.session_state.aba == "estoque":
+    st.header("📦 Estoque Atual")
+    df = pd.DataFrame({'Item': ['AAS', 'Aerolin'], 'Qtd': [29, 2]})
+    st.table(df)
+
+elif st.session_state.aba == "inventario":
+    st.header("📅 Inventário por Período")
+    d1 = st.date_input("De")
+    d2 = st.date_input("Até")
+    st.button("Gerar Relatório")
