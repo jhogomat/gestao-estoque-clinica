@@ -1,174 +1,161 @@
-import streamlit as st
-import pandas as pd
+from flask import Flask, render_template_string, request, jsonify
+from tinydb import TinyDB, Query
 from datetime import datetime
+import os
 
-# 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(
-    page_title="SafeStock | Gestão Assistencial",
-    page_icon="🏥",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+app = Flask(__name__)
 
-# 2. CSS CUSTOMIZADO (ESTILO SAAS / MODERN)
-st.markdown("""
+# Banco de dados local (arquivo JSON)
+db = TinyDB('estoque_db.json')
+tbl_prods = db.table('produtos')
+tbl_movs = db.table('movimentacoes')
+tbl_cats = db.table('categorias')
+
+# --- TEMPLATE HTML (Jinja2 + Tailwind) ---
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>MGM Consultoria - BioConect Stock (Python Version)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-    /* Fundo da aplicação */
-    .stApp {
-        background-color: #F8FAFC;
-    }
-    
-    /* Customização da Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: #FFFFFF;
-        border-right: 1px solid #E2E8F0;
-    }
-
-    /* Cards de Dashboard (Neumorfismo Leve) */
-    .metric-card {
-        background-color: #FFFFFF;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        border: 1px solid #F1F5F9;
-        text-align: center;
-    }
-
-    /* Botões Modernos */
-    .stButton>button {
-        width: 100%;
-        border-radius: 8px;
-        border: none;
-        background-color: #2563EB;
-        color: white;
-        transition: all 0.3s ease;
-        font-weight: 500;
-        height: 45px;
-    }
-    
-    .stButton>button:hover {
-        background-color: #1D4ED8;
-        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
-        transform: translateY(-1px);
-    }
-
-    /* Inputs arredondados */
-    .stTextInput>div>div>input, .stSelectbox>div>div>div {
-        border-radius: 8px !important;
-    }
-
-    /* Tabelas */
-    .styled-table {
-        width: 100%;
-        border-collapse: collapse;
-        border-radius: 8px;
-        overflow: hidden;
-    }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
     </style>
-    """, unsafe_allow_html=True)
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <header class="bg-white border-b p-4 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <i data-lucide="shield-check" class="text-blue-600"></i>
+                <h1 class="text-xl font-bold italic">BioConect <span class="text-blue-600 underline">Python</span></h1>
+            </div>
+            <span class="text-xs bg-slate-200 px-2 py-1 rounded">Servidor Ativo: Localhost:5000</span>
+        </div>
+    </header>
 
-# 3. LÓGICA DE LOGIN (Simplificada para o exemplo)
-if 'autenticado' not in st.session_state:
-    st.session_state.autenticado = False
+    <div class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <aside class="space-y-2">
+            <button onclick="showTab('tab-dash')" class="w-full text-left p-3 hover:bg-white rounded-lg flex items-center gap-2"><i data-lucide="layout-dashboard"></i> Gestão de Riscos</button>
+            <button onclick="showTab('tab-prod')" class="w-full text-left p-3 hover:bg-white rounded-lg flex items-center gap-2"><i data-lucide="package"></i> Cadastro Produto</button>
+            <button onclick="showTab('tab-estoque')" class="w-full text-left p-3 hover:bg-white rounded-lg flex items-center gap-2"><i data-lucide="database"></i> Estoque Real</button>
+        </aside>
 
-if not st.session_state.autenticado:
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("<div style='text-align: center; margin-top: 50px;'>", unsafe_allow_html=True)
-        st.title("🔐 SafeStock")
-        st.subheader("Gestão de Riscos & Qualidade")
-        with st.form("login"):
-            u = st.text_input("E-mail institucional")
-            p = st.text_input("Senha", type="password")
-            if st.form_submit_button("Acessar Painel"):
-                if u == "fhomarcos@gmail.com" and p == "clinica2026":
-                    st.session_state.autenticado = True
-                    st.session_state.usuario = u
-                    st.rerun()
-                else:
-                    st.error("Credenciais inválidas")
-        st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
+        <main class="lg:col-span-3">
+            <div id="tab-dash" class="tab-content active">
+                <h2 class="text-2xl font-bold mb-4">Dashboard de Riscos Assistenciais</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="dash-stats">
+                    </div>
+            </div>
 
-# 4. MENU LATERAL REESTRUTURADO
-with st.sidebar:
-    st.markdown(f"### 🏥 SafeStock")
-    st.caption(f"Logado como: **{st.session_state.usuario}**")
-    st.divider()
+            <div id="tab-prod" class="tab-content bg-white p-6 rounded-xl border">
+                <h2 class="text-xl font-bold mb-4">Novo Produto</h2>
+                <form id="form-produto" class="grid grid-cols-2 gap-4">
+                    <input type="text" name="id" placeholder="ID (ex: 1001)" class="border p-2 rounded" required>
+                    <input type="text" name="nome" placeholder="Nome do Item" class="border p-2 rounded" required>
+                    <input type="number" name="minimo" placeholder="Estoque Mínimo" class="border p-2 rounded" required>
+                    <button type="submit" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Salvar no Python DB</button>
+                </form>
+            </div>
+
+            <div id="tab-estoque" class="tab-content bg-white p-6 rounded-xl border">
+                <h2 class="text-xl font-bold mb-4">Tabela de Inventário</h2>
+                <table class="w-full border-collapse">
+                    <thead><tr class="bg-slate-100 text-left"><th class="p-2 border">ID</th><th class="p-2 border">Nome</th><th class="p-2 border">Saldo</th></tr></thead>
+                    <tbody id="lista-estoque"></tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function showTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if(id === 'tab-estoque') carregarEstoque();
+            if(id === 'tab-dash') carregarDash();
+        }
+
+        // Chamada API para Salvar Produto
+        document.getElementById('form-produto').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.from_ those(formData.entries());
+            
+            const response = await fetch('/api/produto', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const res = await response.json();
+            alert(res.msg);
+            e.target.reset();
+        };
+
+        async function carregarEstoque() {
+            const res = await fetch('/api/estoque');
+            const dados = await res.json();
+            const body = document.getElementById('lista-estoque');
+            body.innerHTML = dados.map(p => `
+                <tr class="border-b">
+                    <td class="p-2 border">${p.id}</td>
+                    <td class="p-2 border">${p.nome}</td>
+                    <td class="p-2 border font-bold ${p.saldo <= p.minimo ? 'text-red-500' : ''}">${p.saldo}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function carregarDash() {
+            const res = await fetch('/api/estoque');
+            const dados = await res.json();
+            const abaixo = dados.filter(p => p.saldo <= p.minimo).length;
+            
+            document.getElementById('dash-stats').innerHTML = `
+                <div class="bg-white p-6 border rounded-xl shadow-sm">
+                    <p class="text-sm text-slate-500">Total de Itens</p>
+                    <p class="text-3xl font-bold">${dados.length}</p>
+                </div>
+                <div class="bg-red-50 p-6 border border-red-100 rounded-xl shadow-sm">
+                    <p class="text-sm text-red-600 font-bold">Risco de Ruptura (Min)</p>
+                    <p class="text-3xl font-bold text-red-700">${abaixo}</p>
+                </div>
+            `;
+        }
+
+        window.onload = () => { lucide.createIcons(); carregarDash(); };
+    </script>
+</body>
+</html>
+"""
+
+# --- ROTAS DA API ---
+
+@app.route('/')
+def index():
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route('/api/produto', methods=['POST'])
+def add_produto():
+    data = request.json
+    # Verifica se já existe
+    if tbl_prods.search(Query().id == data['id']):
+        return jsonify({"msg": "Erro: ID já existe no banco Python!"}), 400
     
-    # Navegação com ícones
-    if st.button("📊 Dashboard Geral"): st.session_state.aba = "dash"
-    if st.button("📦 Estoque Atual"): st.session_state.aba = "estoque"
-    st.markdown("---")
-    st.markdown("### Operações")
-    if st.button("📥 Entrada de Itens"): st.session_state.aba = "entrada"
-    if st.button("📤 Registro de Saída"): st.session_state.aba = "saida"
-    st.markdown("---")
-    st.markdown("### Configurações")
-    if st.button("📝 Cadastro de Produtos"): st.session_state.aba = "cad_prod"
-    if st.button("📂 Categorias"): st.session_state.aba = "categoria"
-    if st.button("📅 Auditoria/Inventário"): st.session_state.aba = "inventario"
-    
-    st.sidebar.markdown("<br>"*5, unsafe_allow_html=True)
-    if st.button("🚪 Sair do Sistema"):
-        st.session_state.autenticado = False
-        st.rerun()
+    tbl_prods.insert(data)
+    # Simula entrada inicial de 0
+    return jsonify({"msg": "Produto salvo com sucesso no TinyDB!"})
 
-if 'aba' not in st.session_state: st.session_state.aba = "dash"
+@app.route('/api/estoque', methods=['GET'])
+def get_estoque():
+    todos_prods = tbl_prods.all()
+    # Aqui poderíamos calcular as movimentações reais no Python
+    # Para este exemplo rápido, retornamos o cadastro com um saldo fixo fictício
+    for p in todos_prods:
+        p['saldo'] = 5  # No sistema real, faríamos o cálculo das tabelas de Entrada/Saída
+    return jsonify(todos_prods)
 
-# 5. CONTEÚDO PRINCIPAL
-if st.session_state.aba == "dash":
-    st.title("📊 Dashboard de Gestão de Riscos")
-    st.markdown("Monitoramento de conformidade e níveis críticos de assistência.")
-    
-    # Cards de Métricas Estilizados
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        st.markdown('<div class="metric-card"><p style="color:#64748B;">Itens Totais</p><h2>972</h2></div>', unsafe_allow_html=True)
-    with m2:
-        st.markdown('<div class="metric-card"><p style="color:#64748B;">Riscos (Qtd Mínima)</p><h2 style="color:#F59E0B;">08</h2></div>', unsafe_allow_html=True)
-    with m3:
-        st.markdown('<div class="metric-card"><p style="color:#64748B;">Validade Próxima</p><h2 style="color:#EF4444;">03</h2></div>', unsafe_allow_html=True)
-    with m4:
-        st.markdown('<div class="metric-card"><p style="color:#64748B;">Status Geral</p><h2 style="color:#10B981;">Conforme</h2></div>', unsafe_allow_html=True)
-
-    st.divider()
-    
-    # Exemplo de Gráfico ou Tabela de Risco
-    col_inf1, col_inf2 = st.columns(2)
-    with col_inf1:
-        st.subheader("⚠️ Alertas de Reposição")
-        df_alert = pd.DataFrame({'Item': ['Luva Estéril', 'Soro Fisiológico'], 'Qtd': [5, 12], 'Status': ['Crítico', 'Atenção']})
-        st.table(df_alert)
-    with col_inf2:
-        st.subheader("📈 Movimentação (Últimos 7 dias)")
-        st.line_chart(pd.DataFrame([10, 25, 15, 40, 32, 28, 45]))
-
-elif st.session_state.aba == "estoque":
-    st.header("📦 Gerenciamento de Estoque")
-    # Barra de busca rápida
-    search = st.text_input("🔍 Buscar por nome ou código do produto...")
-    
-    df = pd.DataFrame({
-        'Código': ['MT-001', 'MD-042', 'MT-088'],
-        'Item': ['Gaze 7,5x7,5', 'Dipirona 500mg/ml', 'Seringa 5ml'],
-        'Categoria': ['Materiais', 'Medicamentos', 'Materiais'],
-        'Qtd Atual': [120, 45, 12],
-        'Lote': ['2024AX', '9988-B', 'L-09']
-    })
-    st.dataframe(df, use_container_width=True, hide_index=True)
-
-elif st.session_state.aba == "entrada":
-    st.header("📥 Entrada de Materiais")
-    with st.container():
-        st.info("Utilize esta tela para registrar o recebimento de notas fiscais e doações.")
-        with st.form("f_ent", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            c1.text_input("Número do Pedido / NF")
-            c2.date_input("Data de Recebimento")
-            st.selectbox("Fornecedor", ["Distribuidora Saúde", "Almoxarifado Central"])
-            st.number_input("Quantidade", min_value=1)
-            if st.form_submit_button("Confirmar Entrada no Sistema"):
-                st.success("Entrada registrada com sucesso!")
-
-# ... Outras abas seguem o mesmo padrão de containers e colunas ...
+if __name__ == '__main__':
+    # Rodar em modo debug para desenvolvimento
+    app.run(debug=True, port=5000)

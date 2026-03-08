@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioConect - Gestão de Estoque & Riscos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <header class="bg-white border-b border-slate-200 p-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <i data-lucide="activity" class="text-blue-600"></i>
+                <h1 class="text-xl font-bold tracking-tight text-slate-900">BioConect <span class="text-blue-600">Stock</span></h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg cursor-pointer hover:bg-blue-100 transition shadow-sm border border-blue-200">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <span class="text-sm font-semibold">Importar XLSX</span>
+                    <input type="file" id="importExcel" class="hidden" accept=".xlsx, .xls">
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <aside class="lg:col-span-1 space-y-2">
+            <nav class="flex flex-col gap-1">
+                <button onclick="showTab('tab-dash')" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:shadow-sm transition font-medium group text-slate-600" id="btn-dash">
+                    <i data-lucide="layout-dashboard" class="group-hover:text-blue-600"></i> Dashboard de Riscos
+                </button>
+                <button onclick="showTab('tab-cat')" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:shadow-sm transition font-medium group text-slate-600">
+                    <i data-lucide="tags" class="group-hover:text-blue-600"></i> Categorias e Tipos
+                </button>
+                <button onclick="showTab('tab-prod')" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:shadow-sm transition font-medium group text-slate-600">
+                    <i data-lucide="package-plus" class="group-hover:text-blue-600"></i> Cadastro de Produto
+                </button>
+                <hr class="my-2 border-slate-200">
+                <button onclick="showTab('tab-entrada')" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:shadow-sm transition font-medium group text-slate-600">
+                    <i data-lucide="arrow-down-left" class="text-green-600"></i> Entrada de Produto
+                </button>
+                <button onclick="showTab('tab-saida')" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:shadow-sm transition font-medium group text-slate-600">
+                    <i data-lucide="arrow-up-right" class="text-red-600"></i> Saída de Produto
+                </button>
+                <hr class="my-2 border-slate-200">
+                <button onclick="showTab('tab-estoque')" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:shadow-sm transition font-medium group text-slate-600">
+                    <i data-lucide="database" class="group-hover:text-blue-600"></i> Estoque Atual
+                </button>
+                <button onclick="showTab('tab-auditoria')" class="flex items-center gap-3 p-3 rounded-xl hover:bg-white hover:shadow-sm transition font-medium group text-slate-600">
+                    <i data-lucide="clipboard-check" class="group-hover:text-blue-600"></i> Auditoria/Inventário
+                </button>
+            </nav>
+        </aside>
+
+        <main class="lg:col-span-3">
+            
+            <div id="tab-dash" class="tab-content active space-y-6">
+                <h2 class="text-2xl font-bold text-slate-900">Gestão de Riscos Assistenciais</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <p class="text-slate-500 text-sm font-medium">Total de Itens em Lote</p>
+                        <h3 id="dash-total" class="text-3xl font-bold text-slate-900 mt-1">0</h3>
+                    </div>
+                    <div class="bg-amber-50 p-6 rounded-2xl shadow-sm border border-amber-100">
+                        <p class="text-amber-700 text-sm font-medium italic">Risco: Abaixo do Mínimo</p>
+                        <h3 id="dash-minimo" class="text-3xl font-bold text-amber-600 mt-1">0</h3>
+                    </div>
+                    <div class="bg-red-50 p-6 rounded-2xl shadow-sm border border-red-100">
+                        <p class="text-red-700 text-sm font-medium">Risco: Validade (30 dias)</p>
+                        <h3 id="dash-validade" class="text-3xl font-bold text-red-600 mt-1">0</h3>
+                    </div>
+                </div>
+                
+            </div>
+
+            <div id="tab-cat" class="tab-content bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-xl font-bold mb-4">Cadastro de Categoria</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <input type="text" id="cat-nome" placeholder="Ex: Medicamento, Material" class="p-2 border rounded-lg">
+                    <div class="flex gap-2">
+                        <input type="text" id="cat-tipo" placeholder="Ex: Psicotrópico, Permanente" class="p-2 border rounded-lg flex-1">
+                        <button onclick="salvarCategoria()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Adicionar</button>
+                    </div>
+                </div>
+                <div id="lista-categorias" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <div id="tab-prod" class="tab-content bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-xl font-bold mb-4 text-slate-900">Novo Produto</h2>
+                <form id="form-produto" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="p-id" placeholder="ID PROD (SKU)" class="p-2 border rounded-lg" required>
+                    <input type="text" id="p-nome" placeholder="Nome do Produto" class="p-2 border rounded-lg" required>
+                    <input type="text" id="p-dosagem" placeholder="Dosagem (Ex: 500mg)" class="p-2 border rounded-lg">
+                    <select id="p-unidade" class="p-2 border rounded-lg">
+                        <option value="">Unidade de Medida</option>
+                        <option value="Unid">Unid</option>
+                        <option value="Frasco">Frasco</option>
+                        <option value="Ampola">Ampola</option>
+                        <option value="Comprimido">Comprimido</option>
+                    </select>
+                    <input type="text" id="p-volume" placeholder="Volume (Ex: 10ml)" class="p-2 border rounded-lg">
+                    <input type="text" id="p-apresentacao" placeholder="Apresentação (Ex: Caixa c/ 30)" class="p-2 border rounded-lg">
+                    <select id="p-categoria-completa" class="p-2 border rounded-lg"></select>
+                    <input type="number" id="p-minimo" placeholder="Estoque Mínimo" class="p-2 border rounded-lg" required>
+                    <button type="submit" class="md:col-span-2 bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 shadow-md transition">Gravar Produto</button>
+                </form>
+            </div>
+
+            <div id="tab-entrada" class="tab-content bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-xl font-bold mb-4 text-green-700 flex items-center gap-2"><i data-lucide="log-in"></i> Entrada de Lote</h2>
+                <div class="mb-6 p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                    <input type="text" id="search-entrada" oninput="buscarProduto('entrada')" placeholder="Buscar por Nome ou ID do Produto..." class="w-full p-3 rounded-lg border focus:ring-2 focus:ring-blue-500">
+                    <div id="result-entrada" class="mt-2 text-sm text-slate-600 italic">Pesquise para carregar os dados...</div>
+                </div>
+                <form id="form-entrada" class="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-50 pointer-events-none">
+                    <input type="hidden" id="ent-id-base">
+                    <div class="md:col-span-2 grid grid-cols-2 gap-2 text-sm bg-blue-50 p-3 rounded-lg">
+                        <p><strong>ID:</strong> <span id="info-ent-id">-</span></p>
+                        <p><strong>Categoria:</strong> <span id="info-ent-cat">-</span></p>
+                    </div>
+                    <input type="text" id="ent-lote" placeholder="Número do Lote" class="p-2 border rounded-lg" required>
+                    <div class="flex flex-col">
+                        <label class="text-xs text-slate-500 ml-1">Validade</label>
+                        <input type="date" id="ent-validade" class="p-2 border rounded-lg" required>
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-xs text-slate-500 ml-1">Data Entrada</label>
+                        <input type="date" id="ent-data" class="p-2 border rounded-lg bg-slate-100" readonly>
+                    </div>
+                    <input type="number" id="ent-qtd" placeholder="Quantidade Entrada" class="p-2 border rounded-lg" required>
+                    <div class="bg-slate-100 p-2 rounded-lg flex justify-between items-center px-4">
+                        <span class="text-sm font-semibold">Estoque Atual:</span>
+                        <span id="ent-atual-val" class="text-lg font-bold">0</span>
+                    </div>
+                    <button type="submit" class="md:col-span-2 bg-green-600 text-white p-3 rounded-lg font-bold hover:bg-green-700 transition">Confirmar Entrada</button>
+                </form>
+            </div>
+
+            <div id="tab-saida" class="tab-content bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-xl font-bold mb-4 text-red-700 flex items-center gap-2"><i data-lucide="log-out"></i> Saída de Material</h2>
+                <div class="mb-6 p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                    <input type="text" id="search-saida" oninput="buscarProduto('saida')" placeholder="Buscar por Nome ou ID..." class="w-full p-3 rounded-lg border">
+                    <div id="result-saida" class="mt-2 text-sm italic">Selecione o produto para ver os lotes...</div>
+                </div>
+                <form id="form-saida" class="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-50 pointer-events-none">
+                    <input type="hidden" id="sai-id-base">
+                    <select id="sai-lote-select" onchange="updateEstoqueSaida()" class="md:col-span-2 p-2 border rounded-lg bg-yellow-50 font-bold" required>
+                        <option value="">Selecione o Lote disponível</option>
+                    </select>
+                    <input type="date" id="sai-data" class="p-2 border rounded-lg bg-slate-100" readonly>
+                    <input type="number" id="sai-qtd" placeholder="Quantidade Saída" class="p-2 border rounded-lg" required>
+                    <div class="bg-slate-100 p-2 rounded-lg flex justify-between items-center px-4">
+                        <span class="text-sm font-semibold">Saldo no Lote:</span>
+                        <span id="sai-atual-val" class="text-lg font-bold">0</span>
+                    </div>
+                    <button type="submit" class="md:col-span-2 bg-red-600 text-white p-3 rounded-lg font-bold hover:bg-red-700 transition">Confirmar Saída</button>
+                </form>
+            </div>
+
+            <div id="tab-estoque" class="tab-content bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-slate-900">Posição de Estoque (Por Lote)</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-sm">
+                                <th class="p-3 border">ID</th>
+                                <th class="p-3 border">Produto</th>
+                                <th class="p-3 border">Lote</th>
+                                <th class="p-3 border">Validade</th>
+                                <th class="p-3 border">Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-estoque"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-auditoria" class="tab-content bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-xl font-bold mb-4">Auditoria e Inventário</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-2 mb-6">
+                    <input type="date" id="aud-inicio" class="p-2 border rounded-lg text-sm">
+                    <input type="date" id="aud-fim" class="p-2 border rounded-lg text-sm">
+                    <select id="aud-cat" class="p-2 border rounded-lg text-sm">
+                        <option value="">Todas Categorias</option>
+                    </select>
+                    <button onclick="gerarAuditoria()" class="bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition text-sm">Filtrar</button>
+                </div>
+                <div id="resultado-auditoria" class="overflow-x-auto">
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50">
+                                <th class="p-2 border">Data</th>
+                                <th class="p-2 border">Tipo</th>
+                                <th class="p-2 border">Produto</th>
+                                <th class="p-2 border">Lote</th>
+                                <th class="p-2 border">Qtd</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-aud-corpo"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // --- ESTADO DA APLICAÇÃO ---
+        let DB = {
+            categorias: JSON.parse(localStorage.getItem('MGM_cats')) || [],
+            produtos: JSON.parse(localStorage.getItem('MGM_prods')) || [],
+            movimentacoes: JSON.parse(localStorage.getItem('MGM_movs')) || []
+        };
+
+        const saveDB = () => {
+            localStorage.setItem('MGM_cats', JSON.stringify(DB.categorias));
+            localStorage.setItem('MGM_prods', JSON.stringify(DB.produtos));
+            localStorage.setItem('MGM_movs', JSON.stringify(DB.movimentacoes));
+            renderAll();
+        };
+
+        // --- NAVEGAÇÃO ---
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            
+            // Set current dates for forms
+            const today = new Date().toISOString().split('T')[0];
+            if(document.getElementById('ent-data')) document.getElementById('ent-data').value = today;
+            if(document.getElementById('sai-data')) document.getElementById('sai-data').value = today;
+
+            lucide.createIcons();
+        }
+
+        // --- CATEGORIAS ---
+        function salvarCategoria() {
+            const cat = document.getElementById('cat-nome').value.trim();
+            const tipo = document.getElementById('cat-tipo').value.trim();
+            if(!cat || !tipo) return alert("Preencha categoria e tipo!");
+            
+            DB.categorias.push({ cat, tipo });
+            document.getElementById('cat-nome').value = '';
+            document.getElementById('cat-tipo').value = '';
+            saveDB();
+        }
+
+        function renderCategorias() {
+            const container = document.getElementById('lista-categorias');
+            const select = document.getElementById('p-categoria-completa');
+            const audCat = document.getElementById('aud-cat');
+
+            container.innerHTML = '';
+            select.innerHTML = '<option value="">Selecione Categoria/Tipo</option>';
+            audCat.innerHTML = '<option value="">Todas Categorias</option>';
+
+            DB.categorias.forEach((c, index) => {
+                const label = `${c.cat} - ${c.tipo}`;
+                container.innerHTML += `<span class="bg-slate-200 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2">
+                    ${label} <button onclick="removerCat(${index})" class="text-red-500 hover:text-red-700">×</button>
+                </span>`;
+                select.innerHTML += `<option value="${label}">${label}</option>`;
+                audCat.innerHTML += `<option value="${c.cat}">${c.cat}</option>`;
+            });
+        }
+
+        function removerCat(idx) {
+            DB.categorias.splice(idx, 1);
+            saveDB();
+        }
+
+        // --- PRODUTOS ---
+        document.getElementById('form-produto').onsubmit = (e) => {
+            e.preventDefault();
+            const novoProd = {
+                id: document.getElementById('p-id').value,
+                nome: document.getElementById('p-nome').value,
+                dosagem: document.getElementById('p-dosagem').value,
+                unidade: document.getElementById('p-unidade').value,
+                volume: document.getElementById('p-volume').value,
+                apresentacao: document.getElementById('p-apresentacao').value,
+                categoria: document.getElementById('p-categoria-completa').value,
+                minimo: Number(document.getElementById('p-minimo').value)
+            };
+            
+            if(DB.produtos.find(p => p.id === novoProd.id)) return alert("Este ID já existe!");
+            
+            DB.produtos.push(novoProd);
+            e.target.reset();
+            saveDB();
+            alert("Produto cadastrado com sucesso!");
+        };
+
+        // --- BUSCA DINÂMICA (ENTRADA/SAÍDA) ---
+        function buscarProduto(contexto) {
+            const query = document.getElementById(`search-${contexto}`).value.toLowerCase();
+            const resultDiv = document.getElementById(`result-${contexto}`);
+            const form = document.getElementById(`form-${contexto}`);
+
+            if(query.length < 2) {
+                form.classList.add('opacity-50', 'pointer-events-none');
+                return;
+            }
+
+            const p = DB.produtos.find(prod => 
+                prod.id.toLowerCase().includes(query) || 
+                prod.nome.toLowerCase().includes(query)
+            );
+
+            if(p) {
+                resultDiv.innerHTML = `<span class="text-green-600 font-bold">✓ Encontrado: ${p.nome} (${p.apresentacao})</span>`;
+                form.classList.remove('opacity-50', 'pointer-events-none');
+                
+                if(contexto === 'entrada') {
+                    document.getElementById('ent-id-base').value = p.id;
+                    document.getElementById('info-ent-id').innerText = p.id;
+                    document.getElementById('info-ent-cat').innerText = p.categoria;
+                    document.getElementById('ent-atual-val').innerText = getSaldoTotal(p.id);
+                } else {
+                    document.getElementById('sai-id-base').value = p.id;
+                    carregarLotesSaida(p.id);
+                }
+            } else {
+                resultDiv.innerHTML = `<span class="text-red-500 italic">Produto não localizado.</span>`;
+                form.classList.add('opacity-50', 'pointer-events-none');
+            }
+        }
+
+        // --- LÓGICA DE ESTOQUE (SALDOS) ---
+        function getSaldosPorLote(prodId) {
+            const lotes = {};
+            DB.movimentacoes.filter(m => m.prodId === prodId).forEach(m => {
+                const key = `${m.lote}|${m.validade}`;
+                if(!lotes[key]) lotes[key] = 0;
+                lotes[key] += (m.tipo === 'ENTRADA' ? m.qtd : -m.qtd);
+            });
+            return lotes;
+        }
+
+        function getSaldoTotal(prodId) {
+            const saldos = getSaldosPorLote(prodId);
+            return Object.values(saldos).reduce((a, b) => a + b, 0);
+        }
+
+        // --- ENTRADA ---
+        document.getElementById('form-entrada').onsubmit = (e) => {
+            e.preventDefault();
+            const mov = {
+                tipo: 'ENTRADA',
+                prodId: document.getElementById('ent-id-base').value,
+                lote: document.getElementById('ent-lote').value,
+                validade: document.getElementById('ent-validade').value,
+                dataMov: document.getElementById('ent-data').value,
+                qtd: Number(document.getElementById('ent-qtd').value)
+            };
+            DB.movimentacoes.push(mov);
+            saveDB();
+            alert("Entrada registrada!");
+            e.target.reset();
+            document.getElementById('search-entrada').value = '';
+            buscarProduto('entrada');
+        };
+
+        // --- SAÍDA ---
+        function carregarLotesSaida(prodId) {
+            const select = document.getElementById('sai-lote-select');
+            const saldos = getSaldosPorLote(prodId);
+            select.innerHTML = '<option value="">Selecione o Lote (FIFO sugerido)</option>';
+            
+            Object.keys(saldos).forEach(key => {
+                if(saldos[key] > 0) {
+                    const [lote, valid] = key.split('|');
+                    select.innerHTML += `<option value="${key}">${lote} (Val: ${valid}) - Saldo: ${saldos[key]}</option>`;
+                }
+            });
+        }
+
+        function updateEstoqueSaida() {
+            const val = document.getElementById('sai-lote-select').value;
+            const pId = document.getElementById('sai-id-base').value;
+            if(!val) return;
+            const saldos = getSaldosPorLote(pId);
+            document.getElementById('sai-atual-val').innerText = saldos[val];
+        }
+
+        document.getElementById('form-saida').onsubmit = (e) => {
+            e.preventDefault();
+            const keyLote = document.getElementById('sai-lote-select').value;
+            const qtdSaida = Number(document.getElementById('sai-qtd').value);
+            const pId = document.getElementById('sai-id-base').value;
+            const [lote, validade] = keyLote.split('|');
+
+            const saldoLote = getSaldosPorLote(pId)[keyLote];
+
+            if(qtdSaida > saldoLote) {
+                return alert("ERRO: Quantidade de saída maior que o estoque deste lote! Operação bloqueada.");
+            }
+
+            DB.movimentacoes.push({
+                tipo: 'SAIDA',
+                prodId: pId,
+                lote: lote,
+                validade: validade,
+                dataMov: document.getElementById('sai-data').value,
+                qtd: qtdSaida
+            });
+
+            saveDB();
+            alert("Saída registrada com sucesso!");
+            e.target.reset();
+            document.getElementById('search-saida').value = '';
+            buscarProduto('saida');
+        };
+
+        // --- RENDERIZAR ESTOQUE ATUAL ---
+        function renderEstoque() {
+            const corpo = document.getElementById('lista-estoque');
+            corpo.innerHTML = '';
+            
+            DB.produtos.forEach(p => {
+                const saldos = getSaldosPorLote(p.id);
+                Object.keys(saldos).forEach(key => {
+                    if(saldos[key] > 0) {
+                        const [lote, validade] = key.split('|');
+                        corpo.innerHTML += `
+                            <tr class="hover:bg-slate-50 border-b transition">
+                                <td class="p-3 text-xs font-mono">${p.id}</td>
+                                <td class="p-3 font-semibold">${p.nome}</td>
+                                <td class="p-3">${lote}</td>
+                                <td class="p-3 text-sm">${validade}</td>
+                                <td class="p-3 font-bold text-blue-700">${saldos[key]} ${p.unidade}</td>
+                            </tr>
+                        `;
+                    }
+                });
+            });
+        }
+
+        // --- DASHBOARD DE RISCOS ---
+        function renderDashboard() {
+            let totalItens = 0;
+            let riscoMinimo = 0;
+            let riscoValidade = 0;
+            const hoje = new Date();
+            const limiteValidade = new Date();
+            limiteValidade.setDate(hoje.getDate() + 30);
+
+            DB.produtos.forEach(p => {
+                const saldoTotal = getSaldoTotal(p.id);
+                if(saldoTotal > 0) totalItens++;
+                if(saldoTotal > 0 && saldoTotal <= p.minimo) riscoMinimo++;
+
+                const saldos = getSaldosPorLote(p.id);
+                Object.keys(saldos).forEach(key => {
+                    const [lote, validStr] = key.split('|');
+                    const validade = new Date(validStr);
+                    if(saldos[key] > 0 && validade <= limiteValidade) riscoValidade++;
+                });
+            });
+
+            document.getElementById('dash-total').innerText = totalItens;
+            document.getElementById('dash-minimo').innerText = riscoMinimo;
+            document.getElementById('dash-validade').innerText = riscoValidade;
+        }
+
+        // --- AUDITORIA ---
+        function gerarAuditoria() {
+            const inicio = document.getElementById('aud-inicio').value;
+            const fim = document.getElementById('aud-fim').value;
+            const catFiltro = document.getElementById('aud-cat').value;
+            const corpo = document.getElementById('tabela-aud-corpo');
+            
+            corpo.innerHTML = '';
+
+            const filtrados = DB.movimentacoes.filter(m => {
+                const p = DB.produtos.find(prod => prod.id === m.prodId);
+                const dataM = m.dataMov;
+                const matchData = (!inicio || dataM >= inicio) && (!fim || dataM <= fim);
+                const matchCat = !catFiltro || (p && p.categoria.includes(catFiltro));
+                return matchData && matchCat;
+            });
+
+            filtrados.reverse().forEach(m => {
+                const p = DB.produtos.find(prod => prod.id === m.prodId);
+                corpo.innerHTML += `
+                    <tr>
+                        <td class="p-2 border">${m.dataMov}</td>
+                        <td class="p-2 border font-bold ${m.tipo === 'ENTRADA' ? 'text-green-600' : 'text-red-600'}">${m.tipo}</td>
+                        <td class="p-2 border">${p ? p.nome : 'Excluído'}</td>
+                        <td class="p-2 border text-xs">${m.lote}</td>
+                        <td class="p-2 border font-mono">${m.qtd}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // --- IMPORTAÇÃO EXCEL ---
+        document.getElementById('importExcel').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const data = evt.target.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                
+                rows.forEach(row => {
+                    // Mapeamento simples baseado nas colunas
+                    if(row.ID && row.NOME) {
+                        DB.produtos.push({
+                            id: String(row.ID),
+                            nome: row.NOME,
+                            dosagem: row.DOSAGEM || '',
+                            unidade: row.UNIDADE || 'Unid',
+                            volume: row.VOLUME || '',
+                            apresentacao: row.APRESENTACAO || '',
+                            categoria: row.CATEGORIA || '',
+                            minimo: Number(row.MINIMO) || 0
+                        });
+                    }
+                });
+                saveDB();
+                alert(`${rows.length} produtos importados!`);
+            };
+            reader.readAsBinaryString(file);
+        });
+
+        function renderAll() {
+            renderCategorias();
+            renderEstoque();
+            renderDashboard();
+            lucide.createIcons();
+        }
+
+        // Init
+        window.onload = renderAll;
+    </script>
+</body>
+</html>

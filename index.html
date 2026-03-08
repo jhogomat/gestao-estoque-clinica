@@ -1,14 +1,186 @@
-<div class="dashboard-cards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
-    <div class="card" style="background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow); border-left: 5px solid var(--primary);">
-        <span style="color: #64748B; font-size: 12px; font-weight: bold; text-transform: uppercase;">Valor Total em Estoque</span>
-        <h2 id="valor-total" style="color: var(--text-dark); margin-top: 5px;">R$ 0,00</h2>
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão Assistencial - Estoque Pro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-body: #F4F7F6;
+            --glass-bg: rgba(255, 255, 255, 0.9);
+            --primary: #2563EB;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --text-dark: #1E293B;
+            --radius: 12px;
+            --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        body { background: var(--bg-body); color: var(--text-dark); padding: 20px; }
+
+        .container { max-width: 1200px; margin: auto; }
+
+        /* Header e Estilo SaaS */
+        header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 30px; background: var(--glass-bg); 
+            padding: 20px; border-radius: var(--radius); backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: var(--shadow);
+        }
+
+        .btn { 
+            padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer;
+            font-weight: 600; display: flex; align-items: center; gap: 8px; transition: 0.3s;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-2px); }
+
+        /* Barra de Busca e Filtros */
+        .controls { 
+            display: flex; gap: 15px; margin-bottom: 20px; 
+        }
+        .search-bar { 
+            flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: var(--radius);
+            background: white; outline: none;
+        }
+
+        /* Tabela de Produtos */
+        .card-table { 
+            background: white; border-radius: var(--radius); overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { background: #F8FAFC; padding: 15px; font-size: 14px; color: #64748B; }
+        td { padding: 15px; border-top: 1px solid #F1F5F9; }
+
+        /* Status Pill */
+        .status { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .status-ok { background: #DCFCE7; color: #166534; }
+        .status-low { background: #FEF3C7; color: #92400E; }
+
+        /* Ações Rápidas */
+        .actions { display: flex; gap: 10px; }
+        .btn-icon { 
+            width: 32px; height: 32px; border-radius: 6px; border: none; 
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: 0.2s;
+        }
+        .btn-in { background: #DCFCE7; color: var(--success); }
+        .btn-out { background: #FFEDD5; color: var(--warning); }
+        .btn-edit { background: #E0E7FF; color: var(--primary); }
+        .btn-del { background: #FEE2E2; color: var(--danger); }
+        
+        .btn-icon:hover { transform: scale(1.1); }
+        
+        
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div>
+            <h1>🏥 Gestão de Insumos</h1>
+            <p style="color: #64748B; font-size: 14px;">Usuário: fhomarcos@gmail.com</p>
+        </div>
+        <button class="btn btn-primary"><i class="fa-solid fa-plus"></i> Novo Produto</button>
+        <div style="display: flex; gap: 10px;">
+    <button class="btn" style="background: #10B981; color: white;" onclick="exportarExcel()">
+        <i class="fa-solid fa-file-excel"></i> Exportar Inventário
+    </button>
+    <button class="btn btn-primary"><i class="fa-solid fa-plus"></i> Novo Produto</button>
+</div>
+
+    </header>
+
+    <div class="controls">
+        <input type="text" class="search-bar" placeholder="🔍 Pesquisar por nome ou SKU...">
+        <select class="search-bar" style="flex: 0.3;">
+            <option>Todas as Categorias</option>
+            <option>Medicamentos</option>
+            <option>Materiais</option>
+        </select>
     </div>
-    <div class="card" style="background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow); border-left: 5px solid var(--warning);">
-        <span style="color: #64748B; font-size: 12px; font-weight: bold; text-transform: uppercase;">Itens em Risco (Abaixo do Mínimo)</span>
-        <h2 id="itens-risco" style="color: var(--warning); margin-top: 5px;">0</h2>
-    </div>
-    <div class="card" style="background: white; padding: 20px; border-radius: 12px; box-shadow: var(--shadow); border-left: 5px solid var(--danger);">
-        <span style="color: #64748B; font-size: 12px; font-weight: bold; text-transform: uppercase;">Validade Próxima (30 dias)</span>
-        <h2 style="color: var(--danger); margin-top: 5px;">3 itens</h2>
+
+    <div class="card-table">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome do Produto</th>
+                    <th>SKU</th>
+                    <th>Quantidade</th>
+                    <th>Preço</th>
+                    <th>Status</th>
+                    <th>Ações Rápidas</th>
+                </tr>
+            </thead>
+            <tbody id="estoque-body">
+                <tr>
+                    <td><strong>Aerolin 100mg</strong></td>
+                    <td>AE2-2026</td>
+                    <td id="qty-1">2</td>
+                    <td>R$ 45,00</td>
+                    <td><span class="status status-low">Estoque Crítico</span></td>
+                    <td class="actions">
+                        <button class="btn-icon btn-in" onclick="updateStock(1, 1)" title="Entrada"><i class="fa-solid fa-plus"></i></button>
+                        <button class="btn-icon btn-out" onclick="updateStock(1, -1)" title="Saída"><i class="fa-solid fa-minus"></i></button>
+                        <button class="btn-icon btn-edit"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-icon btn-del"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong>AAS 100mg</strong></td>
+                    <td>AA1-2026</td>
+                    <td id="qty-2">29</td>
+                    <td>R$ 12,50</td>
+                    <td><span class="status status-ok">Conforme</span></td>
+                    <td class="actions">
+                        <button class="btn-icon btn-in" onclick="updateStock(2, 1)"><i class="fa-solid fa-plus"></i></button>
+                        <button class="btn-icon btn-out" onclick="updateStock(2, -1)"><i class="fa-solid fa-minus"></i></button>
+                        <button class="btn-icon btn-edit"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-icon btn-del"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
+
+<script>
+    function updateStock(id, change) {
+        const el = document.getElementById('qty-' + id);
+        let current = parseInt(el.innerText);
+        if (current + change >= 0) {
+            el.innerText = current + change;
+            // Aqui entra a lógica de Gestão de Riscos:
+            if (current + change < 5) {
+                el.parentElement.nextElementSibling.nextElementSibling.innerHTML = '<span class="status status-low">Risco Assistencial</span>';
+            } else {
+                el.parentElement.nextElementSibling.nextElementSibling.innerHTML = '<span class="status status-ok">Conforme</span>';
+            }
+        }
+    }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+function exportarExcel() {
+    // Seleciona a tabela do estoque
+    const tabela = document.querySelector("table");
+    
+    // Converte a tabela HTML para uma planilha do Excel
+    const wb = XLSX.utils.table_to_book(tabela, { sheet: "Inventario_Clinica" });
+    
+    // Gera o nome do arquivo com a data atual para Rastreabilidade
+    const dataHora = new Date().toLocaleDateString().replace(/\//g, '-');
+    const nomeArquivo = `Inventario_Qualidade_${dataHora}.xlsx`;
+    
+    // Faz o download automático
+    XLSX.writeFile(wb, nomeArquivo);
+    
+    alert("✅ Relatório de Inventário gerado com sucesso para Auditoria!");
+}
+</body>
+</html>
